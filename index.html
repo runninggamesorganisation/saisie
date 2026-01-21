@@ -27,6 +27,7 @@ html, body{
    Safari n’est plus dans le même contexte => tout paraît zoomé.
 ========================================================= */
 :root{
+  --ui-scale: 0.78; /* ⬅️ ajuste: 0.72 (plus petit) à 0.85 (plus grand) */
   --bg:#0b0b0c;
   --card:#0f1113;
   --text:#f2f6fb;
@@ -94,14 +95,20 @@ button{
 }
 
 #app{
-  height: 100dvh;
+  /* on compense l’échelle pour occuper tout l’écran */
+  width: calc(100% / var(--ui-scale));
+  height: calc(100dvh / var(--ui-scale));
+
+  transform: scale(var(--ui-scale));
+  transform-origin: top center;
+
   display:flex;
   flex-direction:column;
   gap: var(--gap);
   padding: var(--pad);
 
-  /* ✅ Sur mobile, limiter la largeur aide la perception “zoom” */
-  max-width: 640px;
+  /* garde ton max-width si tu veux, mais on le compense aussi */
+  max-width: calc(980px / var(--ui-scale));
   margin: 0 auto;
 
   overflow:hidden;
