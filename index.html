@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Running Games — Saisie / Scan</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+:root{
+  --bg:#0b0b0c;
+  --card:#0f1113;
+  --text:#f2f6fb;
+  --muted:#9aa3ae;
+
+  --primary:#ff7a1a;
+  --danger:#e23b3b;
+
+  --border: rgba(255,255,255,0.10);
+  --border-soft: rgba(255,255,255,0.08);
+  --glass: rgba(255,255,255,0.03);
+  --shadow: 0 14px 40px rgba(0,0,0,0.85);
+
+  --radius: 22px;
+  --pill: 999px;
+
+  --fs-mini: 28px;
+  --fs-base: 34px;
+  --fs-lg: 38px;
+  --fs-xl: 44px;
+
+  --bar-h: clamp(90px, 12dvh, 120px);
+  --camera-h: clamp(540px, 90dvh, 780px);
+
+  --gap: 12px;
+  --pad: 12px;
+
+  --scan-green: rgba(0,255,106,0.92);
+  --scan-green-soft: rgba(0,255,106,0.18);
+}
+
+html, body { height: 100%; }
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+/* Anti-zoom iOS */
+input, textarea, select{
+  font-size: 34px !important;
+  line-height: 1 !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+button{
+  font-size: 38px !important;
+  line-height: 1 !important;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
+}
+
+#app{
+  height: 100dvh;
+  display:flex;
+  flex-direction:column;
+  gap: var(--gap);
+  padding: var(--pad);
+  max-width: 980px;
+  margin: 0 auto;
+  overflow:hidden;
+}
+
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(0,0,0,0.40));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow:hidden;
+}
+
+#setup-card{
+  padding: 16px;
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+
+.label{
+  font-size: var(--fs-mini);
+  font-weight: 900;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.input{
+  width:100%;
+  height: clamp(76px, 10dvh, 96px);
+  border-radius: var(--pill);
+  border: 2px solid rgba(255,255,255,0.10);
+  padding: 0 22px;
+  outline:none;
+  background: var(--glass);
+  color: var(--text);
+  font-size: 34px !important;
+  line-height: 1 !important;
+  max-width: 100%;
+}
+.input::placeholder{ color: rgba(154,163,174,0.85); }
+.input:focus{
+  border-color: rgba(255,122,26,0.75);
+  box-shadow: 0 0 0 9px rgba(255,122,26,0.16);
+}
+
+.empl-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.btn-empl{
+  height: clamp(76px, 10dvh, 96px);
+  border-radius: var(--pill);
+  border: 2px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-weight: 900;
+  font-size: var(--fs-base) !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+}
+.btn-empl.active{
+  background: rgba(255,122,26,0.22);
+  border-color: rgba(255,122,26,0.45);
+  box-shadow: 0 14px 26px rgba(255,122,26,0.20);
+}
+
+.btn-primary{
+  height: clamp(82px, 11dvh, 104px);
+  width:100%;
+  border-radius: var(--pill);
+  border:none;
+  background: var(--primary);
+  color:#111;
+  font-weight: 1000;
+  font-size: var(--fs-lg) !important;
+  line-height: 1 !important;
+  box-shadow: 0 16px 34px rgba(255,122,26,0.35);
+}
+
+#topbar{
+  height: var(--bar-h);
+  display:none;
+  align-items:center;
+  padding: 12px 14px;
+  gap: 14px;
+}
+
+#topbar .mini{
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  min-width:0;
+}
+
+.chip{
+  background: rgba(255,122,26,0.12);
+  border: 2px solid rgba(255,122,26,0.20);
+  padding: 14px 18px;
+  border-radius: var(--pill);
+  font-weight: 900;
+  font-size: 32px !important;
+  line-height: 1 !important;
+
+  max-width: 50%;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+#chip-sync{
+  background: rgba(255,255,255,0.06);
+  border: 2px solid rgba(255,255,255,0.10);
+  color: var(--text);
+  padding: 14px 16px;
+  border-radius: var(--pill);
+  font-weight: 900;
+  font-size: 28px !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.92;
+}
+#chip-sync.sending{
+  border-color: rgba(255,122,26,0.45);
+  box-shadow: 0 10px 20px rgba(255,122,26,0.18);
+}
+
+#btn-edit{
+  height: calc(var(--bar-h) - 18px);
+  width: calc(var(--bar-h) - 18px);
+  border-radius: 18px;
+  border: 2px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-weight: 900;
+  font-size: 38px !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
+
+#modebar{
+  height: var(--bar-h);
+  display:none;
+  padding: 12px;
+}
+
+.mode-grid{
+  height:100%;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.btn-mode{
+  border-radius: var(--pill);
+  border: 2px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  font-weight: 1000;
+  font-size: var(--fs-lg) !important;
+  line-height: 1 !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 10px;
+
+  white-space: nowrap;
+  overflow:hidden;
+  text-overflow: ellipsis;
+}
+.btn-mode.active{
+  background: rgba(255,122,26,0.22);
+  border-color: rgba(255,122,26,0.45);
+  box-shadow: 0 14px 26px rgba(255,122,26,0.20);
+}
+
+#manualbar{
+  height: var(--bar-h);
+  display:none;
+  padding: 12px;
+}
+
+.manual-row{
+  height:100%;
+  display:grid;
+  grid-template-columns: 1fr 220px;
+  gap: 12px;
+  align-items:center;
+
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#dossard{
+  height:100%;
+  border-radius: var(--pill);
+  border: 2px solid rgba(255,255,255,0.10);
+  padding: 0 22px;
+  outline:none;
+  background: var(--glass);
+  color: var(--text);
+
+  width:100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+
+  font-size: 34px !important;
+  line-height: 1 !important;
+}
+#dossard::placeholder{ color: rgba(154,163,174,0.85); }
+#dossard:focus{
+  border-color: rgba(255,122,26,0.75);
+  box-shadow: 0 0 0 9px rgba(255,122,26,0.16);
+}
+
+#btn-valider{
+  height:100%;
+  border-radius: var(--pill);
+  border:none;
+  background: var(--primary);
+  color:#111;
+  font-weight: 1000;
+  font-size: var(--fs-lg) !important;
+  line-height: 1 !important;
+  width:100%;
+  box-shadow: 0 16px 34px rgba(255,122,26,0.35);
+  flex-shrink: 0;
+}
+
+#camerabar{
+  height: var(--camera-h);
+  display:none;
+  background:#050508;
+  border: 2px solid rgba(255,255,255,0.10);
+  box-shadow: 0 18px 44px rgba(0,0,0,0.35);
+  padding: 12px;
+  flex: 0 0 auto;
+}
+
+#camera-inner{
+  height:100%;
+  width:100%;
+  border-radius: 20px;
+  overflow:hidden;
+  background:#000;
+  position:relative;
+}
+
+#reader{
+  height:100%;
+  width:100%;
+}
+#reader video{
+  width:100% !important;
+  height:100% !important;
+  object-fit:cover !important;
+}
+
+/* Hide html5-qrcode overlays */
+#reader__dashboard_section,
+#reader__dashboard_section_csr,
+#reader__dashboard_section_swaplink,
+#reader__scan_region,
+#reader__scan_region img,
+#reader__camera_selection,
+#reader__dashboard,
+#reader canvas {
+  display:none !important;
+  visibility:hidden !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+
+.scan-overlay{
+  pointer-events:none;
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+}
+
+.mask{
+  flex: 0.6;
+  background: rgba(0,0,0,0.55);
+}
+.active-band{
+  flex: 1.8;
+  position:relative;
+  background: rgba(255,255,255,0.10);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.active-rect{
+  width: 96%;
+  height: 82%;
+  border-radius: 18px;
+  border: 4px solid rgba(0,255,106,0.85);
+  box-shadow: 0 0 18px rgba(0,255,106,0.30);
+}
+
+#scan-big{
+  position:absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  z-index: 6;
+  pointer-events:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.scan-last-big{
+  width: 100%;
+  text-align:center;
+  background: rgba(0,0,0,0.35);
+  border: 3px solid rgba(0,255,106,0.55);
+  color: var(--scan-green);
+  padding: 18px 18px;
+  border-radius: 18px;
+  font-weight: 1000;
+  font-size: clamp(44px, 6.5vw, 72px);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.55);
+  text-shadow: 0 0 18px rgba(0,255,106,0.22);
+  opacity: 0.95;
+}
+
+@keyframes pulseGreen {
+  0%   { transform: scale(1);   box-shadow: 0 0 18px rgba(0,255,106,0.20); border-color: rgba(0,255,106,0.55); }
+  50%  { transform: scale(1.06); box-shadow: 0 0 44px rgba(0,255,106,0.60); border-color: rgba(0,255,106,0.85); }
+  100% { transform: scale(1);   box-shadow: 0 0 18px rgba(0,255,106,0.20); border-color: rgba(0,255,106,0.55); }
+}
+.scan-last-big.pulse{ animation: pulseGreen 280ms ease-out; }
+
+#scan-mini{
+  position:absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display:flex;
+  justify-content:space-between;
+  gap: 12px;
+  pointer-events:auto;
+}
+.scan-pill{
+  border-radius: var(--pill);
+  border: 2px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.35);
+  color: var(--text);
+  padding: 16px 18px;
+  font-size: var(--fs-mini) !important;
+  line-height: 1 !important;
+  font-weight: 900;
+  text-align:center;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#scan-last{ flex:1; text-align:left; min-width:0; }
+#btn-scan-start, #btn-scan-stop{
+  width: 220px;
+  font-weight: 1000;
+  border-color: transparent;
+  flex-shrink:0;
+}
+#btn-scan-start{ background: var(--primary); color:#111; }
+#btn-scan-stop{ background: rgba(255,255,255,0.18); display:none; color:var(--text); }
+
+#history{
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+
+.entry{
+  display:flex;
+  align-items:center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 2px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  margin-bottom: 12px;
+}
+
+.entry span{
+  flex:1;
+  min-width:0;
+  font-size: 38px !important;
+  line-height: 1.0 !important;
+  font-weight: 1000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry-cancelled{
+  opacity:.50;
+  text-decoration: line-through;
+}
+
+.entry-delete{
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  border:none;
+  background: var(--danger);
+  color:#fff;
+  font-weight: 1000;
+  font-size: 38px !important;
+  line-height: 1 !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  box-shadow: 0 12px 24px rgba(226,59,59,0.35);
+}
+
+.placeholder{
+  color: var(--muted);
+  font-size: 34px !important;
+  line-height: 1.15 !important;
+  padding: 18px 10px;
+  text-align:center;
+}
+  </style>
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- SETUP -->
+    <div id="setup-card" class="card">
+      <div>
+        <div class="label">Nom</div>
+        <input id="setup-nom" class="input" type="text" inputmode="text"
+               autocapitalize="words" autocomplete="name" placeholder="Votre nom" />
+      </div>
+
+      <div>
+        <div class="label">Emplacement</div>
+        <div class="empl-grid">
+          <button class="btn-empl" data-empl="Départ">Départ</button>
+          <button class="btn-empl" data-empl="6k">6 km</button>
+          <button class="btn-empl" data-empl="Arrivée">Arrivée</button>
+        </div>
+      </div>
+
+      <button id="setup-validate" class="btn-primary">Valider</button>
+    </div>
+
+    <!-- TOPBAR -->
+    <div id="topbar" class="card">
+      <div class="mini">
+        <div id="chip-nom" class="chip">—</div>
+        <div id="chip-empl" class="chip">—</div>
+        <div id="chip-sync" class="chip-sync">Sync: 0</div>
+      </div>
+      <button id="btn-edit" title="Modifier">✎</button>
+    </div>
+
+    <!-- MODE -->
+    <div id="modebar" class="card">
+      <div class="mode-grid">
+        <button id="mode-saisie" class="btn-mode active">⌨️ Saisie</button>
+        <button id="mode-scan" class="btn-mode">📷 Scan</button>
+        <button id="mode-histo" class="btn-mode">🕘 Historique</button>
+      </div>
+    </div>
+
+    <!-- SAISIE -->
+    <div id="manualbar" class="card">
+      <div class="manual-row">
+        <input id="dossard" type="text" inputmode="numeric" pattern="[0-9]*"
+               autocomplete="off" placeholder="Dossard (1–150)" />
+        <button id="btn-valider">Valider</button>
+      </div>
+    </div>
+
+    <!-- CAMERA -->
+    <div id="camerabar" class="card">
+      <div id="camera-inner">
+        <div id="reader"></div>
+
+        <div class="scan-overlay">
+          <div class="mask"></div>
+          <div class="active-band">
+            <div class="active-rect"></div>
+          </div>
+          <div class="mask"></div>
+        </div>
+
+        <div id="scan-big">
+          <div id="scan-last-big" class="scan-last-big">#—</div>
+        </div>
+
+        <div id="scan-mini">
+          <div id="scan-last" class="scan-pill">Dernier: —</div>
+          <button id="btn-scan-start" class="scan-pill">Démarrer</button>
+          <button id="btn-scan-stop" class="scan-pill">Arrêter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div id="history" class="card">
+      <div class="placeholder">Chargement…</div>
+    </div>
+
+  </div>
+
+<script>
+/* =========================================================
+   CONFIG
+   IMPORTANT: ce script n'utilise PLUS aucun fetch vers Apps Script (CORS).
+   Tout passe en JSONP (script tag).
+========================================================= */
+const API_BASE = "https://script.google.com/macros/s/AKfycbxmddS3Y-40rxY1zK5yR7dGQaTQpbHqJwU5RS7dQtSDMFRQsrjvzd1XJ1zZek6zVAQP4A/exec";
+
+/* =========================================================
+   STATE (in-memory)
+========================================================= */
+let nom = "";
+let emplacement = "";
+let isLocked = true;
+let mode = "saisie"; // saisie | scan | historique
+
+let sending = false;
+
+const INACTIVITY_DELAY = 5000;
+const MAX_BATCH = 30;
+const MAX_AGE = 30000;
+let inactivityTimer = null;
+let maxAgeTimer = null;
+let firstScanTimestamp = null;
+let retryDelay = 200;
+
+const SCAN_DUP_WINDOW_MS = 10_000;
+const recentScans = new Map();
+
+/* =========================================================
+   DOM
+========================================================= */
+const setupCard = document.getElementById("setup-card");
+const setupNom = document.getElementById("setup-nom");
+const setupValidate = document.getElementById("setup-validate");
+const emplBtns = Array.from(document.querySelectorAll(".btn-empl"));
+
+const topbar = document.getElementById("topbar");
+const chipNom = document.getElementById("chip-nom");
+const chipEmpl = document.getElementById("chip-empl");
+const chipSync = document.getElementById("chip-sync");
+const btnEdit = document.getElementById("btn-edit");
+
+const modebar = document.getElementById("modebar");
+const btnModeSaisie = document.getElementById("mode-saisie");
+const btnModeScan = document.getElementById("mode-scan");
+const btnModeHisto = document.getElementById("mode-histo");
+
+const manualbar = document.getElementById("manualbar");
+const dossardInput = document.getElementById("dossard");
+const btnValider = document.getElementById("btn-valider");
+
+const camerabar = document.getElementById("camerabar");
+const scanLast = document.getElementById("scan-last");
+const scanLastBig = document.getElementById("scan-last-big");
+const btnScanStart = document.getElementById("btn-scan-start");
+const btnScanStop = document.getElementById("btn-scan-stop");
+
+const history = document.getElementById("history");
+
+/* =========================================================
+   IndexedDB — durable storage
+   DB: running-games
+   Stores:
+     - kv (key -> value)
+     - scans (id -> scanObj), indexes: ts, status
+========================================================= */
+
+let dbPromise = null;
+
+function openDb_(){
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open("running-games", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("kv")) {
+        db.createObjectStore("kv", { keyPath: "key" });
+      }
+      if (!db.objectStoreNames.contains("scans")) {
+        const store = db.createObjectStore("scans", { keyPath: "id" });
+        store.createIndex("ts", "tsMs", { unique: false });
+        store.createIndex("status", "status", { unique: false });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+async function kvGet_(key){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readonly");
+    const st = tx.objectStore("kv");
+    const req = st.get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function kvSet_(key, value){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore("kv").put({ key, value });
+  });
+}
+
+async function kvDel_(key){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore("kv").delete(key);
+  });
+}
+
+async function scanPut_(scanObj){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("scans", "readwrite");
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore("scans").put(scanObj);
+  });
+}
+
+async function scanGet_(id){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("scans", "readonly");
+    const req = tx.objectStore("scans").get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function scanQueryLatest_(limit){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const out = [];
+    const tx = db.transaction("scans", "readonly");
+    const idx = tx.objectStore("scans").index("ts");
+    const req = idx.openCursor(null, "prev");
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve(out);
+      out.push(cur.value);
+      if (out.length >= limit) return resolve(out);
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function scanPickPendingBatch_(maxBatch){
+  const db = await openDb_();
+  return new Promise((resolve, reject) => {
+    const out = [];
+    const tx = db.transaction("scans", "readonly");
+    const idx = tx.objectStore("scans").index("ts");
+    const req = idx.openCursor(null, "next");
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve(out);
+      const v = cur.value;
+      if (v && v.status === "pending" && !v.cancelled) {
+        out.push(v);
+        if (out.length >= maxBatch) return resolve(out);
+      }
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function scanMarkCancelled_(id){
+  const v = await scanGet_(id);
+  if (!v) return false;
+  v.cancelled = true;
+  if (v.status === "pending" || v.status === "inflight") v.status = "cancelled";
+  await scanPut_(v);
+  return true;
+}
+
+/* =========================================================
+   JSONP helpers (PAS DE FETCH, PAS DE CORS)
+========================================================= */
+function b64WebSafe_(str){
+  const utf8 = new TextEncoder().encode(str);
+  let bin = "";
+  utf8.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+
+function jsonpCall_(paramsObj, timeoutMs = 15000){
+  return new Promise((resolve, reject) => {
+    const cbName = "__rg_cb_" + Math.random().toString(36).slice(2);
+    const params = { ...paramsObj, callback: cbName, _: String(Date.now()) };
+    const qs = new URLSearchParams(params).toString();
+    const url = `${API_BASE}?${qs}`;
+
+    const script = document.createElement("script");
+    let timer = null;
+
+    window[cbName] = (res) => {
+      cleanup();
+      resolve(res);
+    };
+
+    function cleanup(){
+      if (timer) clearTimeout(timer);
+      try { delete window[cbName]; } catch(e) { window[cbName] = undefined; }
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("JSONP timeout"));
+    }, timeoutMs);
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("JSONP load error"));
+    };
+
+    script.src = url;
+    document.head.appendChild(script);
+  });
+}
+
+function jsonpAppend_(lot, timeoutMs = 15000){
+  const payload = b64WebSafe_(JSON.stringify(lot));
+  return jsonpCall_({ action: "append", payload }, timeoutMs);
+}
+
+/* =========================================================
+   Persistence helpers (meta)
+========================================================= */
+async function persistMeta_(){
+  await kvSet_("metaUser", { nom, emplacement, isLocked: false });
+}
+async function loadMeta_(){
+  const meta = await kvGet_("metaUser");
+  if (meta && meta.nom && meta.emplacement) {
+    nom = meta.nom;
+    emplacement = meta.emplacement;
+    isLocked = false;
+  }
+}
+
+/* =========================================================
+   iOS focus helpers
+========================================================= */
+function focusWithoutScroll(el){
+  if (!el) return;
+  const x = window.scrollX;
+  const y = window.scrollY;
+  try { el.focus({ preventScroll: true }); }
+  catch (e) { el.focus(); }
+  requestAnimationFrame(() => window.scrollTo(x, y));
+  setTimeout(() => window.scrollTo(x, y), 50);
+  setTimeout(() => window.scrollTo(x, y), 250);
+}
+function bindNoRecenterFocus(el){
+  if (!el) return;
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    focusWithoutScroll(el);
+  }, { passive: false });
+  el.addEventListener("focus", () => {
+    const x = window.scrollX, y = window.scrollY;
+    requestAnimationFrame(() => window.scrollTo(x, y));
+  });
+}
+bindNoRecenterFocus(setupNom);
+bindNoRecenterFocus(dossardInput);
+
+/* =========================================================
+   Feedback scan (pulse + bip + vibration)
+========================================================= */
+let audioCtx = null;
+function ensureAudioUnlocked(){
+  try{
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  }catch(e){}
+}
+function beepOK(){
+  try{
+    if (!audioCtx) return;
+    if (audioCtx.state === "suspended") audioCtx.resume();
+
+    const t0 = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1900, t0);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, t0);
+
+    const comp = audioCtx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-24, t0);
+    comp.knee.setValueAtTime(18, t0);
+    comp.ratio.setValueAtTime(12, t0);
+    comp.attack.setValueAtTime(0.003, t0);
+    comp.release.setValueAtTime(0.08, t0);
+
+    osc.connect(gain);
+    gain.connect(comp);
+    comp.connect(audioCtx.destination);
+
+    gain.gain.exponentialRampToValueAtTime(0.35, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+
+    const t1 = t0 + 0.16;
+    gain.gain.setValueAtTime(0.0001, t1);
+    gain.gain.exponentialRampToValueAtTime(0.32, t1 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t1 + 0.08);
+
+    osc.start(t0);
+    osc.stop(t0 + 0.28);
+  }catch(e){}
+}
+function vibrateOK(){
+  try{ if (navigator.vibrate) navigator.vibrate([35, 25, 35]); }catch(e){}
+}
+function pulseBig(){
+  if (!scanLastBig) return;
+  scanLastBig.classList.remove("pulse");
+  void scanLastBig.offsetWidth;
+  scanLastBig.classList.add("pulse");
+}
+function feedbackOK(){
+  pulseBig();
+  beepOK();
+  vibrateOK();
+}
+function setScanBig(text){
+  if (!scanLastBig) return;
+  scanLastBig.textContent = text || "#—";
+}
+
+/* =========================================================
+   UI helpers
+========================================================= */
+function format(ts){ return new Date(ts).toLocaleTimeString("fr-FR", { hour12:false }); }
+
+function setEmplSelected(val){
+  emplacement = val;
+  emplBtns.forEach(b => b.classList.toggle("active", b.dataset.empl === val));
+}
+emplBtns.forEach(btn => btn.addEventListener("click", () => setEmplSelected(btn.dataset.empl)));
+
+async function countPendingPlusInflight_(){
+  const latest = await scanQueryLatest_(5000);
+  let n = 0;
+  for (const s of latest){
+    if (!s || s.cancelled) continue;
+    if (s.status === "pending" || s.status === "inflight") n++;
+  }
+  return n;
+}
+
+async function updateSyncChip(){
+  const total = await countPendingPlusInflight_();
+  chipSync.textContent = sending ? `Sync… ${total}` : `Sync: ${total}`;
+  chipSync.classList.toggle("sending", !!sending);
+}
+
+async function renderHistory(){
+  if (isLocked){
+    history.innerHTML = `<div class="placeholder">En attente de validation (Nom + Emplacement)…</div>`;
+    return;
+  }
+
+  const max = (mode === "historique") ? 5000 : 5;
+  const scans = await scanQueryLatest_(max);
+
+  const visible = scans.filter(s => s && s.status !== "cancelled");
+  if (!visible.length){
+    history.innerHTML = `<div class="placeholder">Aucun scan pour l’instant.</div>`;
+    return;
+  }
+
+  history.innerHTML = visible.map(s => {
+    const label = `${format(s.tsMs)} — ${s.emplacement} — #${s.dossard}${s.source === "scan" ? " 📷" : ""}`;
+    const cancelledCls = s.cancelled ? "entry-cancelled" : "";
+    const delBtn = s.cancelled ? "" : `<button class="entry-delete" onclick="annuler('${s.id}', this)">×</button>`;
+    return `
+      <div class="entry ${cancelledCls}">
+        <span>${label}</span>
+        ${delBtn}
+      </div>
+    `;
+  }).join("");
+}
+
+/* =========================================================
+   Boot
+========================================================= */
+window.addEventListener("load", async () => {
+  try{
+    await openDb_();
+  }catch(e){
+    history.innerHTML = `<div class="placeholder">Erreur stockage local (IndexedDB). Vérifie Safari (pas mode privé).</div>`;
+    return;
+  }
+
+  await loadMeta_();
+  await updateSyncChip();
+
+  if (!isLocked){
+    chipNom.textContent = nom;
+    chipEmpl.textContent = emplacement;
+
+    setupCard.style.display = "none";
+    topbar.style.display = "flex";
+    modebar.style.display = "block";
+
+    setMode("saisie", { skipFocus:true });
+  }
+
+  const batch = await scanPickPendingBatch_(1);
+  if (batch.length > 0) scheduleSend();
+
+  await renderHistory();
+});
+
+/* =========================================================
+   Mode switching
+========================================================= */
+function setMode(next, opts={}){
+  if (isLocked) return;
+
+  mode = next;
+  btnModeSaisie.classList.toggle("active", mode === "saisie");
+  btnModeScan.classList.toggle("active", mode === "scan");
+  btnModeHisto.classList.toggle("active", mode === "historique");
+
+  if (mode === "saisie"){
+    manualbar.style.display = "block";
+    camerabar.style.display = "none";
+    stopScanner();
+    setScanBig("#—");
+    if (!opts.skipFocus) setTimeout(() => focusWithoutScroll(dossardInput), 0);
+  } else if (mode === "scan"){
+    manualbar.style.display = "none";
+    camerabar.style.display = "block";
+    setScanBig("#—");
+  } else {
+    manualbar.style.display = "none";
+    camerabar.style.display = "none";
+    stopScanner();
+    setScanBig("#—");
+  }
+
+  renderHistory();
+}
+btnModeSaisie.addEventListener("click", () => setMode("saisie"));
+btnModeScan.addEventListener("click", () => setMode("scan"));
+btnModeHisto.addEventListener("click", () => setMode("historique"));
+
+/* =========================================================
+   Setup validation / edit
+========================================================= */
+setupValidate.addEventListener("click", async () => {
+  ensureAudioUnlocked();
+
+  const n = setupNom.value.trim();
+  if (!n) return alert("Nom obligatoire");
+  if (!emplacement) return alert("Emplacement obligatoire");
+
+  nom = n;
+  isLocked = false;
+
+  chipNom.textContent = nom;
+  chipEmpl.textContent = emplacement;
+
+  setupCard.style.display = "none";
+  topbar.style.display = "flex";
+  modebar.style.display = "block";
+
+  await persistMeta_();
+
+  setMode("saisie");
+  await renderHistory();
+  await updateSyncChip();
+
+  setTimeout(() => focusWithoutScroll(dossardInput), 0);
+});
+
+btnEdit.addEventListener("click", async () => {
+  ensureAudioUnlocked();
+
+  isLocked = true;
+  stopScanner();
+
+  setupNom.value = nom || "";
+  setupCard.style.display = "block";
+  topbar.style.display = "none";
+  modebar.style.display = "none";
+  manualbar.style.display = "none";
+  camerabar.style.display = "none";
+
+  await kvDel_("metaUser");
+
+  await renderHistory();
+  setTimeout(() => focusWithoutScroll(setupNom), 0);
+});
+
+/* =========================================================
+   Commit scan
+========================================================= */
+function genId_(){
+  return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+async function commitScan(dossVal, source){
+  if (isLocked) return false;
+  if (!Number.isInteger(dossVal) || dossVal < 1 || dossVal > 150) {
+    alert("Dossard invalide (1–150)");
+    return false;
+  }
+
+  const scanTsMs = Date.now();
+  const id = genId_();
+
+  const scanObj = {
+    id,
+    nom,
+    emplacement,
+    dossard: dossVal,
+    tsMs: scanTsMs,
+    source,              // "scan" | "manual"
+    cancelled: false,
+    status: "pending",   // pending | inflight | sent | cancelled
+    ageMs: 0
+  };
+
+  await scanPut_(scanObj);
+
+  await updateSyncChip();
+  scheduleSend();
+  await renderHistory();
+  return true;
+}
+
+function validerSaisie(){
+  ensureAudioUnlocked();
+
+  const digits = String(dossardInput.value || "").replace(/\D+/g, "");
+  const doss = parseInt(digits, 10);
+
+  if (doss === 200) {
+    runDeviceTest("manual");
+    dossardInput.value = "";
+    return;
+  }
+
+  commitScan(doss, "manual").then(ok => {
+    if (ok){
+      dossardInput.value = "";
+      focusWithoutScroll(dossardInput);
+    }
+  });
+}
+
+btnValider.addEventListener("click", validerSaisie);
+dossardInput.addEventListener("keydown", (e) => { if (e.key === "Enter") validerSaisie(); });
+
+/* =========================================================
+   Cancel (annuler) — JSONP (pas fetch)
+========================================================= */
+async function annuler(id, btn){
+  const scan = await scanGet_(id);
+  if (!scan) return;
+
+  const label = `${format(scan.tsMs)} — ${scan.emplacement} — #${scan.dossard}`;
+  if (!confirm(`Supprimer : ${label} ?`)) return;
+
+  if (scan.status === "pending" || scan.status === "inflight"){
+    await scanMarkCancelled_(id);
+    await updateSyncChip();
+    await renderHistory();
+    return;
+  }
+
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "…";
+
+  jsonpCall_({ action: "cancel", id })
+    .then(async (res) => {
+      if (!res || !res.ok) throw new Error("cancel failed");
+      await scanMarkCancelled_(id);
+      await renderHistory();
+    })
+    .catch(() => {
+      alert("Erreur réseau");
+      btn.textContent = oldText;
+      btn.disabled = false;
+    });
+}
+window.annuler = annuler;
+
+/* =========================================================
+   Sending logic — JSONP append
+========================================================= */
+function scheduleSend() {
+  if (!firstScanTimestamp) {
+    firstScanTimestamp = Date.now();
+    maxAgeTimer = setTimeout(sendNow, MAX_AGE);
+  }
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(sendNow, INACTIVITY_DELAY);
+}
+
+async function sendNow() {
+  if (sending) return;
+
+  const batch = await scanPickPendingBatch_(MAX_BATCH);
+  if (batch.length === 0) { await updateSyncChip(); return; }
+
+  const now = Date.now();
+  const ids = batch.map(s => s.id);
+
+  // marque inflight + ageMs
+  for (const s of batch){
+    s.status = "inflight";
+    s.ageMs = (typeof s.tsMs === "number") ? (now - s.tsMs) : 0;
+    await scanPut_(s);
+  }
+
+  sending = true;
+  await updateSyncChip();
+
+  // payload attendu: [id, nom, emplacement, dossard, tsMs, "", ageMs]
+  const lot = batch.map(s => [s.id, s.nom, s.emplacement, s.dossard, s.tsMs, "", s.ageMs]);
+
+  jsonpAppend_(lot)
+    .then(async (res) => {
+      if (!res || !res.ok) throw new Error("api error");
+
+      for (const id of ids){
+        const s = await scanGet_(id);
+        if (!s) continue;
+        if (s.status === "inflight") {
+          s.status = "sent";
+          await scanPut_(s);
+        }
+      }
+
+      sending = false;
+      retryDelay = 200;
+
+      clearTimeout(inactivityTimer);
+      clearTimeout(maxAgeTimer);
+      inactivityTimer = null;
+      maxAgeTimer = null;
+      firstScanTimestamp = null;
+
+      await updateSyncChip();
+
+      const more = await scanPickPendingBatch_(1);
+      if (more.length > 0) scheduleSend();
+    })
+    .catch(async () => {
+      for (const id of ids){
+        const s = await scanGet_(id);
+        if (!s) continue;
+        if (s.status === "inflight") {
+          s.status = "pending";
+          await scanPut_(s);
+        }
+      }
+
+      sending = false;
+      await updateSyncChip();
+
+      setTimeout(sendNow, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 15000);
+    });
+}
+
+/* =========================================================
+   Scanner
+========================================================= */
+let html5QrCode = null;
+let scanning = false;
+
+let lastDecoded = null;
+let lastDecodedAt = 0;
+const SAME_CODE_DEBOUNCE_MS = 900;
+
+function decodeToDossard(decodedText){
+  const digits = String(decodedText).replace(/\D+/g, "");
+  if (!digits) return null;
+  const n = parseInt(digits, 10);
+  if (!Number.isInteger(n) || n < 1 || n > 200) return null;
+  return n;
+}
+
+function shouldDropDuplicate(doss){
+  const now = Date.now();
+  for (const [k, t] of recentScans.entries()){
+    if (now - t > SCAN_DUP_WINDOW_MS) recentScans.delete(k);
+  }
+  const prev = recentScans.get(doss);
+  if (prev && (now - prev) < SCAN_DUP_WINDOW_MS) return true;
+  recentScans.set(doss, now);
+  return false;
+}
+
+function buildScanConfig(){
+  const qrbox = (vw, vh) => {
+    const w = Math.floor(vw * 0.96);
+    const h = Math.floor(vh * 0.45);
+    return { width: w, height: h };
+  };
+
+  return {
+    fps: 14,
+    qrbox,
+    aspectRatio: 16/9,
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E
+    ],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    videoConstraints: {
+      facingMode: "environment",
+      width:  { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
+  };
+}
+
+async function startScanner(){
+  ensureAudioUnlocked();
+
+  if (isLocked) return alert("Valide d’abord Nom + Emplacement.");
+  if (scanning) return;
+
+  if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+  try{
+    scanning = true;
+    btnScanStart.style.display = "none";
+    btnScanStop.style.display = "block";
+    scanLast.textContent = "Dernier: —";
+    setScanBig("#—");
+
+    const cfg = buildScanConfig();
+
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      cfg,
+      (decodedText) => {
+        const now = Date.now();
+        if (decodedText === lastDecoded && (now - lastDecodedAt) < SAME_CODE_DEBOUNCE_MS) return;
+        lastDecoded = decodedText;
+        lastDecodedAt = now;
+
+        const doss = decodeToDossard(decodedText);
+        if (doss === 200) { runDeviceTest("scan"); return; }
+        if (!doss) return;
+
+        if (shouldDropDuplicate(doss)) {
+          scanLast.textContent = `Dernier: #${doss} (doublon 10s)`;
+          return;
+        }
+
+        scanLast.textContent = `Dernier: #${doss}`;
+        setScanBig(`#${doss}`);
+        feedbackOK();
+        commitScan(doss, "scan");
+      },
+      () => {}
+    );
+
+  } catch(e){
+    scanning = false;
+    btnScanStart.style.display = "block";
+    btnScanStop.style.display = "none";
+    alert("Impossible d’accéder à la caméra. Vérifie les autorisations (HTTPS).");
+    console.error(e);
+  }
+}
+
+async function stopScanner(){
+  if (!html5QrCode || !scanning) return;
+  try { await html5QrCode.stop(); } catch(e) {}
+  scanning = false;
+  btnScanStart.style.display = "block";
+  btnScanStop.style.display = "none";
+}
+
+btnScanStart.addEventListener("click", startScanner);
+btnScanStop.addEventListener("click", stopScanner);
+window.addEventListener("beforeunload", () => stopScanner());
+
+/* =========================================================
+   Device test (dossard 200) — JSONP (pas fetch)
+========================================================= */
+function showTestBanner(html, kind="ok"){
+  const bg = (kind === "ok") ? "rgba(0,255,106,0.22)" : "rgba(226,59,59,0.22)";
+  const bd = (kind === "ok") ? "rgba(0,255,106,0.65)" : "rgba(226,59,59,0.65)";
+
+  const el = document.createElement("div");
+  el.style.position = "fixed";
+  el.style.left = "12px";
+  el.style.right = "12px";
+  el.style.top = "12px";
+  el.style.zIndex = "9999";
+  el.style.padding = "18px";
+  el.style.borderRadius = "18px";
+  el.style.background = bg;
+  el.style.border = `3px solid ${bd}`;
+  el.style.backdropFilter = "blur(8px)";
+  el.style.fontWeight = "1000";
+  el.style.fontSize = "34px";
+  el.innerHTML = html;
+
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+function runDeviceTest(source){
+  ensureAudioUnlocked();
+
+  const clientStart = Date.now();
+
+  const battPromise = (navigator.getBattery)
+    ? navigator.getBattery().then(b => ({
+        level: Math.round(b.level*100),
+        charging: !!b.charging
+      })).catch(() => null)
+    : Promise.resolve(null);
+
+  const net = navigator.connection ? {
+    type: navigator.connection.effectiveType || "",
+    downlink: navigator.connection.downlink || null,
+    rtt: navigator.connection.rtt || null
+  } : null;
+
+  showTestBanner(`🧪 TEST EN COURS…<br><span style="opacity:.9">Source: ${source}</span>`, "ok");
+
+  battPromise.then(batt => {
+    jsonpCall_({ action: "ping", source: source, t: String(clientStart) })
+      .then((res) => {
+        const clientMs = Date.now() - clientStart;
+
+        if (!res || !res.ok){
+          showTestBanner(`❌ TEST KO<br><span style="opacity:.9">Réponse serveur invalide</span>`, "ko");
+          return;
+        }
+
+        const lines = [];
+        lines.push(`✅ <b>TEST OK</b>`);
+        lines.push(`<span style="opacity:.95">Latence totale: <b>${clientMs} ms</b> (serveur: ${res.serverMs} ms)</span>`);
+        lines.push(`<span style="opacity:.85">Heure serveur: ${res.serverTime}</span>`);
+        if (res.version) lines.push(`<span style="opacity:.85">Version: ${res.version}</span>`);
+        if (net) lines.push(`<span style="opacity:.85">Réseau: ${net.type} (rtt ${net.rtt ?? "?"} ms)</span>`);
+        if (batt) lines.push(`<span style="opacity:.85">Batterie: ${batt.level}% ${batt.charging ? "⚡" : ""}</span>`);
+
+        showTestBanner(lines.join("<br>"), "ok");
+        feedbackOK();
+      })
+      .catch(() => {
+        showTestBanner(`❌ TEST KO<br><span style="opacity:.9">Réseau / autorisations / serveur</span>`, "ko");
+      });
+  });
+}
+</script>
+</body>
+</html>
