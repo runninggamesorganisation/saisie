@@ -9,25 +9,15 @@
 
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-  <style>
+<style>
 /* =========================================================
-   iOS: empêche l’auto-agrandissement de texte
+   Base saine + responsive (iPhone 11 OK)
+   - pas de px géants
+   - rem + clamp()
+   - inputs >=16px pour éviter le zoom iOS
 ========================================================= */
-html, body{
-  height: 100%;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
 
-*{ box-sizing:border-box; }
-
-/* =========================================================
-   THEME + TAILLES RESPONSIVES (⬅️ C’EST ICI LE FIX)
-   Avant tu avais des px énormes (34/38/44). Sur GitHub Pages
-   Safari n’est plus dans le même contexte => tout paraît zoomé.
-========================================================= */
 :root{
-  --ui-scale: 0.78; /* ⬅️ ajuste: 0.72 (plus petit) à 0.85 (plus grand) */
   --bg:#0b0b0c;
   --card:#0f1113;
   --text:#f2f6fb;
@@ -41,25 +31,33 @@ html, body{
   --glass: rgba(255,255,255,0.03);
   --shadow: 0 14px 40px rgba(0,0,0,0.85);
 
-  --radius: 22px;
+  --radius: 18px;
   --pill: 999px;
 
-  /* ✅ Police responsive (min 16px pour éviter le zoom iOS sur focus) */
-  --fs-mini: clamp(14px, 3.4vw, 16px);
-  --fs-base: clamp(16px, 4.1vw, 18px);
-  --fs-lg:   clamp(18px, 4.6vw, 20px);
-  --fs-xl:   clamp(20px, 5.2vw, 22px);
+  /* Typo responsive (proche de ta capture A) */
+  --fs-mini: clamp(0.85rem, 2.6vw, 0.95rem);
+  --fs-base: clamp(0.95rem, 3.0vw, 1.05rem);
+  --fs-lg:   clamp(1.05rem, 3.4vw, 1.18rem);
+  --fs-xl:   clamp(1.15rem, 3.9vw, 1.32rem);
 
-  /* ✅ Hauteurs responsives (beaucoup moins haut qu’avant) */
-  --bar-h:    clamp(56px, 8.5dvh, 78px);
-  --camera-h: clamp(320px, 55dvh, 520px);
+  /* Hauteurs plus compactes */
+  --bar-h: clamp(64px, 9.5dvh, 86px);
+  --camera-h: clamp(320px, 52dvh, 560px);
 
   --gap: 10px;
   --pad: 10px;
 
   --scan-green: rgba(0,255,106,0.92);
-  --scan-green-soft: rgba(0,255,106,0.18);
 }
+
+/* Empêche iOS de “gonfler” le texte */
+html, body{
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+*{ box-sizing:border-box; }
 
 body{
   margin:0;
@@ -69,51 +67,29 @@ body{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  position: fixed;
-  inset: 0;
+  /* IMPORTANT : on arrête le body fixed qui casse souvent Safari */
   overflow: hidden;
-
-  overscroll-behavior: none;
-  touch-action: manipulation;
 }
 
-/* ✅ IMPORTANT:
-   iOS “zoom” les inputs si font-size < 16px.
-   Donc on garde un MIN à 16px, mais on réduit fortement le reste. */
-input, textarea, select{
-  font-size: var(--fs-base) !important;   /* >=16px grâce à clamp */
-  line-height: 1.1 !important;
-  -webkit-appearance: none;
-  appearance: none;
-}
-button{
-  font-size: var(--fs-lg) !important;
-  line-height: 1.1 !important;
-  -webkit-appearance: none;
-  appearance: none;
-  touch-action: manipulation;
-}
-
+/* Conteneur principal */
 #app{
-  /* on compense l’échelle pour occuper tout l’écran */
-  width: calc(100% / var(--ui-scale));
-  height: calc(100dvh / var(--ui-scale));
-
-  transform: scale(var(--ui-scale));
-  transform-origin: top center;
-
+  min-height: 100dvh;
   display:flex;
   flex-direction:column;
   gap: var(--gap);
-  padding: var(--pad);
 
-  /* garde ton max-width si tu veux, mais on le compense aussi */
-  max-width: calc(980px / var(--ui-scale));
+  padding:
+    calc(var(--pad) + env(safe-area-inset-top))
+    calc(var(--pad) + env(safe-area-inset-right))
+    calc(var(--pad) + env(safe-area-inset-bottom))
+    calc(var(--pad) + env(safe-area-inset-left));
+
+  max-width: 980px;
   margin: 0 auto;
-
-  overflow:hidden;
+  overflow: hidden;
 }
 
+/* Cards */
 .card{
   background: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(0,0,0,0.40));
   border: 1px solid var(--border-soft);
@@ -122,6 +98,27 @@ button{
   overflow:hidden;
 }
 
+/* =========================
+   Inputs / Buttons (anti-zoom iOS)
+========================= */
+input, textarea, select, button{
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+}
+
+/* ✅ iOS Safari : éviter le zoom auto -> 16px minimum */
+input, textarea, select{
+  font-size: 16px;
+}
+button{
+  font-size: 16px;
+  touch-action: manipulation;
+}
+
+/* =========================
+   Setup
+========================= */
 #setup-card{
   padding: 14px;
   display:flex;
@@ -131,65 +128,63 @@ button{
 
 .label{
   font-size: var(--fs-mini);
-  font-weight: 900;
+  font-weight: 800;
   margin-bottom: 6px;
-  color: var(--text);
 }
 
 .input{
   width:100%;
-  height: clamp(48px, 7.5dvh, 64px);
+  height: clamp(52px, 8.5dvh, 68px);
   border-radius: var(--pill);
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   padding: 0 16px;
   outline:none;
   background: var(--glass);
   color: var(--text);
-  font-size: var(--fs-base) !important;
-  line-height: 1.1 !important;
-  max-width: 100%;
 }
 .input::placeholder{ color: rgba(154,163,174,0.85); }
 .input:focus{
   border-color: rgba(255,122,26,0.75);
-  box-shadow: 0 0 0 7px rgba(255,122,26,0.16);
+  box-shadow: 0 0 0 6px rgba(255,122,26,0.16);
 }
 
 .empl-grid{
   display:grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
+
 .btn-empl{
-  height: clamp(48px, 7.5dvh, 64px);
+  height: clamp(52px, 8.5dvh, 68px);
   border-radius: var(--pill);
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
   color: var(--text);
-  font-weight: 900;
-  font-size: var(--fs-base) !important;
-  line-height: 1.1 !important;
+  font-weight: 800;
+  font-size: var(--fs-base);
   white-space: nowrap;
 }
 .btn-empl.active{
   background: rgba(255,122,26,0.22);
   border-color: rgba(255,122,26,0.45);
-  box-shadow: 0 14px 26px rgba(255,122,26,0.20);
+  box-shadow: 0 10px 22px rgba(255,122,26,0.18);
 }
 
 .btn-primary{
-  height: clamp(52px, 8.2dvh, 70px);
+  height: clamp(56px, 9dvh, 74px);
   width:100%;
   border-radius: var(--pill);
   border:none;
   background: var(--primary);
   color:#111;
-  font-weight: 1000;
-  font-size: var(--fs-lg) !important;
-  line-height: 1.1 !important;
-  box-shadow: 0 16px 34px rgba(255,122,26,0.35);
+  font-weight: 900;
+  font-size: var(--fs-lg);
+  box-shadow: 0 14px 30px rgba(255,122,26,0.30);
 }
 
+/* =========================
+   Topbar
+========================= */
 #topbar{
   height: var(--bar-h);
   display:none;
@@ -208,29 +203,24 @@ button{
 
 .chip{
   background: rgba(255,122,26,0.12);
-  border: 2px solid rgba(255,122,26,0.20);
-  padding: 10px 12px;
+  border: 1px solid rgba(255,122,26,0.22);
+  padding: 10px 14px;
   border-radius: var(--pill);
-  font-weight: 900;
-  font-size: var(--fs-base) !important;
-  line-height: 1.1 !important;
-
-  max-width: 50%;
+  font-weight: 800;
+  font-size: var(--fs-base);
+  max-width: 45%;
   overflow:hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
 }
 
 #chip-sync{
   background: rgba(255,255,255,0.06);
-  border: 2px solid rgba(255,255,255,0.10);
-  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.12);
   padding: 10px 12px;
   border-radius: var(--pill);
-  font-weight: 900;
-  font-size: var(--fs-mini) !important;
-  line-height: 1.1 !important;
+  font-weight: 800;
+  font-size: var(--fs-mini);
   white-space: nowrap;
   flex-shrink: 0;
   opacity: 0.92;
@@ -241,20 +231,23 @@ button{
 }
 
 #btn-edit{
-  height: calc(var(--bar-h) - 14px);
-  width: calc(var(--bar-h) - 14px);
-  border-radius: 16px;
-  border: 2px solid rgba(255,255,255,0.10);
+  height: calc(var(--bar-h) - 18px);
+  width: calc(var(--bar-h) - 18px);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
   color: var(--text);
   font-weight: 900;
-  font-size: var(--fs-lg) !important;
+  font-size: var(--fs-lg);
   display:flex;
   align-items:center;
   justify-content:center;
   flex-shrink:0;
 }
 
+/* =========================
+   Modebar
+========================= */
 #modebar{
   height: var(--bar-h);
   display:none;
@@ -264,18 +257,18 @@ button{
 .mode-grid{
   height:100%;
   display:grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .btn-mode{
   border-radius: var(--pill);
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.04);
   color: var(--text);
-  font-weight: 1000;
-  font-size: var(--fs-lg) !important;
-  line-height: 1.1 !important;
+  font-weight: 900;
+  font-size: var(--fs-lg);
+
   display:flex;
   align-items:center;
   justify-content:center;
@@ -288,9 +281,12 @@ button{
 .btn-mode.active{
   background: rgba(255,122,26,0.22);
   border-color: rgba(255,122,26,0.45);
-  box-shadow: 0 14px 26px rgba(255,122,26,0.20);
+  box-shadow: 0 10px 22px rgba(255,122,26,0.18);
 }
 
+/* =========================
+   Manual bar
+========================= */
 #manualbar{
   height: var(--bar-h);
   display:none;
@@ -300,36 +296,28 @@ button{
 .manual-row{
   height:100%;
   display:grid;
-  grid-template-columns: 1fr 160px; /* ✅ plus petit */
+  grid-template-columns: 1fr clamp(110px, 26vw, 150px);
   gap: 10px;
   align-items:center;
-
   width: 100%;
   min-width: 0;
-  overflow: hidden;
 }
 
 #dossard{
   height:100%;
   border-radius: var(--pill);
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   padding: 0 16px;
   outline:none;
   background: var(--glass);
   color: var(--text);
-
   width:100%;
   min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-
-  font-size: var(--fs-base) !important;
-  line-height: 1.1 !important;
 }
 #dossard::placeholder{ color: rgba(154,163,174,0.85); }
 #dossard:focus{
   border-color: rgba(255,122,26,0.75);
-  box-shadow: 0 0 0 7px rgba(255,122,26,0.16);
+  box-shadow: 0 0 0 6px rgba(255,122,26,0.16);
 }
 
 #btn-valider{
@@ -338,19 +326,20 @@ button{
   border:none;
   background: var(--primary);
   color:#111;
-  font-weight: 1000;
-  font-size: var(--fs-lg) !important;
-  line-height: 1.1 !important;
+  font-weight: 900;
+  font-size: var(--fs-lg);
   width:100%;
-  box-shadow: 0 16px 34px rgba(255,122,26,0.35);
-  flex-shrink: 0;
+  box-shadow: 0 14px 30px rgba(255,122,26,0.30);
 }
 
+/* =========================
+   Camera
+========================= */
 #camerabar{
   height: var(--camera-h);
   display:none;
   background:#050508;
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   box-shadow: 0 18px 44px rgba(0,0,0,0.35);
   padding: 10px;
   flex: 0 0 auto;
@@ -359,7 +348,7 @@ button{
 #camera-inner{
   height:100%;
   width:100%;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow:hidden;
   background:#000;
   position:relative;
@@ -398,24 +387,21 @@ button{
   flex-direction:column;
 }
 
-.mask{
-  flex: 0.6;
-  background: rgba(0,0,0,0.55);
-}
+.mask{ flex: 0.6; background: rgba(0,0,0,0.55); }
 .active-band{
   flex: 1.8;
   position:relative;
-  background: rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.08);
   display:flex;
   align-items:center;
   justify-content:center;
 }
 .active-rect{
-  width: 96%;
-  height: 82%;
-  border-radius: 18px;
-  border: 4px solid rgba(0,255,106,0.85);
-  box-shadow: 0 0 18px rgba(0,255,106,0.30);
+  width: 94%;
+  height: 78%;
+  border-radius: 16px;
+  border: 3px solid rgba(0,255,106,0.75);
+  box-shadow: 0 0 16px rgba(0,255,106,0.25);
 }
 
 #scan-big{
@@ -433,24 +419,21 @@ button{
   width: 100%;
   text-align:center;
   background: rgba(0,0,0,0.35);
-  border: 3px solid rgba(0,255,106,0.55);
+  border: 2px solid rgba(0,255,106,0.45);
   color: var(--scan-green);
   padding: 12px 12px;
-  border-radius: 18px;
-  font-weight: 1000;
-  /* ✅ avant: clamp(44px, 6.5vw, 72px) -> énorme */
-  font-size: clamp(22px, 6vw, 34px);
-  line-height: 1.05;
-  letter-spacing: 0.02em;
-  box-shadow: 0 14px 30px rgba(0,0,0,0.55);
-  text-shadow: 0 0 18px rgba(0,255,106,0.22);
+  border-radius: 16px;
+  font-weight: 900;
+  font-size: clamp(1.6rem, 6.2vw, 2.6rem);
+  line-height: 1;
+  box-shadow: 0 12px 26px rgba(0,0,0,0.55);
   opacity: 0.95;
 }
 
 @keyframes pulseGreen {
-  0%   { transform: scale(1);   box-shadow: 0 0 18px rgba(0,255,106,0.20); border-color: rgba(0,255,106,0.55); }
-  50%  { transform: scale(1.05); box-shadow: 0 0 44px rgba(0,255,106,0.60); border-color: rgba(0,255,106,0.85); }
-  100% { transform: scale(1);   box-shadow: 0 0 18px rgba(0,255,106,0.20); border-color: rgba(0,255,106,0.55); }
+  0%   { transform: scale(1);   box-shadow: 0 0 16px rgba(0,255,106,0.18); }
+  50%  { transform: scale(1.04); box-shadow: 0 0 34px rgba(0,255,106,0.45); }
+  100% { transform: scale(1);   box-shadow: 0 0 16px rgba(0,255,106,0.18); }
 }
 .scan-last-big.pulse{ animation: pulseGreen 280ms ease-out; }
 
@@ -464,15 +447,15 @@ button{
   gap: 10px;
   pointer-events:auto;
 }
+
 .scan-pill{
   border-radius: var(--pill);
-  border: 2px solid rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.12);
   background: rgba(0,0,0,0.35);
   color: var(--text);
   padding: 10px 12px;
-  font-size: var(--fs-mini) !important;
-  line-height: 1.1 !important;
-  font-weight: 900;
+  font-size: var(--fs-mini);
+  font-weight: 800;
   text-align:center;
   white-space:nowrap;
   overflow:hidden;
@@ -480,14 +463,17 @@ button{
 }
 #scan-last{ flex:1; text-align:left; min-width:0; }
 #btn-scan-start, #btn-scan-stop{
-  width: 150px;
-  font-weight: 1000;
+  width: clamp(110px, 26vw, 150px);
+  font-weight: 900;
   border-color: transparent;
   flex-shrink:0;
 }
 #btn-scan-start{ background: var(--primary); color:#111; }
 #btn-scan-stop{ background: rgba(255,255,255,0.18); display:none; color:var(--text); }
 
+/* =========================
+   History
+========================= */
 #history{
   flex: 1 1 auto;
   overflow-y: auto;
@@ -502,8 +488,8 @@ button{
   align-items:center;
   gap: 10px;
   padding: 12px;
-  border-radius: 20px;
-  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.10);
   background: rgba(255,255,255,0.02);
   margin-bottom: 10px;
 }
@@ -511,9 +497,9 @@ button{
 .entry span{
   flex:1;
   min-width:0;
-  font-size: var(--fs-lg) !important;
-  line-height: 1.1 !important;
-  font-weight: 1000;
+  font-size: var(--fs-lg);
+  line-height: 1.05;
+  font-weight: 900;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -525,30 +511,30 @@ button{
 }
 
 .entry-delete{
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   border:none;
   background: var(--danger);
   color:#fff;
-  font-weight: 1000;
-  font-size: var(--fs-xl) !important;
-  line-height: 1 !important;
+  font-weight: 900;
+  font-size: 1.4rem;
   display:flex;
   align-items:center;
   justify-content:center;
   flex-shrink:0;
-  box-shadow: 0 12px 24px rgba(226,59,59,0.35);
+  box-shadow: 0 10px 20px rgba(226,59,59,0.28);
 }
 
 .placeholder{
   color: var(--muted);
-  font-size: var(--fs-base) !important;
-  line-height: 1.2 !important;
+  font-size: var(--fs-base);
+  line-height: 1.2;
   padding: 14px 10px;
   text-align:center;
 }
-  </style>
+</style>
+
 </head>
 
 <body>
