@@ -74,7 +74,7 @@ body{
 
 /* Conteneur principal */
 #app{
-  /* ✅ hauteur fixe => #history a une vraie zone scrollable */
+  /* ✅ hauteur fixe => scroll interne fiable iOS */
   height: 100dvh;
   min-height: 100dvh;
 
@@ -101,6 +101,13 @@ body{
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow:hidden;
+}
+
+/* ✅ Empêche Safari de "compresser" les barres en haut */
+#topbar, #modebar, #manualbar, #camerabar{
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-height: var(--bar-h);
 }
 
 /* =========================
@@ -487,24 +494,36 @@ button{
 #btn-scan-stop{ background: rgba(255,255,255,0.18); display:none; color:var(--text); }
 
 /* =========================
-   History (scroll) — ✅ FIX iOS
+   History (header fixe + liste scroll)
 ========================= */
 #history{
   flex: 1 1 auto;
   min-height: 0;
 
-  overflow: auto; /* ✅ plus fiable iOS que overflow-y/overflow-x */
-  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
 
+  overflow: hidden; /* le container ne scrolle plus */
+}
+
+#history-header{
+  flex: 0 0 auto;
+  padding: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(11,11,12,0.92);
+  backdrop-filter: blur(10px);
+}
+
+#history-list{
+  flex: 1 1 auto;
+  min-height: 0;
+
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
 
   padding: 10px;
-}
-
-/* ✅ la card met overflow:hidden : on force pour iOS */
-#history.card{
-  overflow: auto !important;
 }
 
 .entry{
@@ -648,7 +667,10 @@ button{
 
     <!-- HISTORY -->
     <div id="history" class="card">
-      <div class="placeholder">Chargement…</div>
+      <div id="history-header"></div>
+      <div id="history-list">
+        <div class="placeholder">Chargement…</div>
+      </div>
     </div>
 
   </div>
@@ -664,6 +686,9 @@ const API_BASE = "https://script.google.com/macros/s/AKfycbxmddS3Y-40rxY1zK5yR7d
 ========================================================= */
 const PASSWORD = "RG2026*";
 
+/* =========================================================
+   STATE (in-memory)
+========================================================= */
 let nom = "";
 let emplacement = "";
 let isLocked = true;
@@ -712,6 +737,8 @@ const btnScanStart = document.getElementById("btn-scan-start");
 const btnScanStop = document.getElementById("btn-scan-stop");
 
 const history = document.getElementById("history");
+const historyHeader = document.getElementById("history-header");
+const historyList = document.getElementById("history-list");
 
 /* AUTH DOM */
 const authCard = document.getElementById("auth-card");
@@ -1149,7 +1176,8 @@ window.exportCsv = exportCsv;
 ========================================================= */
 async function renderHistory(){
   if (isLocked){
-    history.innerHTML = `<div class="placeholder">En attente de validation (Nom + Emplacement)…</div>`;
+    historyHeader.innerHTML = "";
+    historyList.innerHTML = `<div class="placeholder">En attente de validation (Nom + Emplacement)…</div>`;
     return;
   }
 
@@ -1158,22 +1186,23 @@ async function renderHistory(){
 
   const visible = scans.filter(s => s && s.status !== "cancelled");
   if (!visible.length){
-    history.innerHTML = `<div class="placeholder">Aucun scan pour l’instant.</div>`;
+    historyHeader.innerHTML = "";
+    historyList.innerHTML = `<div class="placeholder">Aucun scan pour l’instant.</div>`;
     return;
   }
 
-  const exportBar = (mode === "historique")
-    ? `
-      <div style="position:sticky; top:0; z-index:5; padding:10px; background:rgba(11,11,12,0.92); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.08);">
-        <button class="btn-primary" style="height:54px; font-size:16px;" onclick="exportCsv()">Exporter CSV</button>
-        <div style="margin-top:8px; opacity:.8; font-size:12px;">
-          Colonnes: ID, Nom, Emplacement, Dossard, Heure pointage, Annulation, heure copie
-        </div>
+  if (mode === "historique"){
+    historyHeader.innerHTML = `
+      <button class="btn-primary" style="height:54px; font-size:16px;" onclick="exportCsv()">Exporter CSV</button>
+      <div style="margin-top:8px; opacity:.8; font-size:12px;">
+        Colonnes: ID, Nom, Emplacement, Dossard, Heure pointage, Annulation, heure copie
       </div>
-    `
-    : "";
+    `;
+  } else {
+    historyHeader.innerHTML = "";
+  }
 
-  history.innerHTML = exportBar + visible.map(s => {
+  historyList.innerHTML = visible.map(s => {
     const label = `${format(s.tsMs)} — ${s.emplacement} — #${s.dossard}${s.source === "scan" ? " 📷" : ""}`;
     const cancelledCls = s.cancelled ? "entry-cancelled" : "";
     const delBtn = s.cancelled ? "" : `<button class="entry-delete" onclick="annuler('${s.id}', this)">×</button>`;
@@ -1193,7 +1222,7 @@ window.addEventListener("load", async () => {
   try{
     await openDb_();
   }catch(e){
-    history.innerHTML = `<div class="placeholder">Erreur stockage local (IndexedDB). Vérifie Safari (pas mode privé).</div>`;
+    historyList.innerHTML = `<div class="placeholder">Erreur stockage local (IndexedDB). Vérifie Safari (pas mode privé).</div>`;
     return;
   }
 
@@ -1333,7 +1362,7 @@ async function commitScan(dossVal, source){
     cancelled: false,
     status: "pending",   // pending | inflight | sent | cancelled
     ageMs: 0,
-    sentAtMs: null       // ✅ heure copie (quand confirmé côté serveur)
+    sentAtMs: null       // ✅ heure copie
   };
 
   await scanPut_(scanObj);
@@ -1443,7 +1472,7 @@ async function sendNow() {
         if (!s) continue;
         if (s.status === "inflight") {
           s.status = "sent";
-          s.sentAtMs = Date.now(); // ✅ heure copie
+          s.sentAtMs = Date.now();
           await scanPut_(s);
         }
       }
