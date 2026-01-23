@@ -1674,6 +1674,21 @@ function runDeviceTest(source){
 
   const clientStart = Date.now();
 
+  const net = navigator.connection ? {
+    type: navigator.connection.effectiveType || "",
+    downlink: navigator.connection.downlink || null,
+    rtt: navigator.connection.rtt || null
+  } : null;
+
+  showTestBanner(
+    `🧪 TEST EN COURS…<br><span style="opacity:.9">Source: ${source}</span><br><span style="opacity:.75;font-size:12px;">Ping: ${API_BASE}</span>`,
+    "ok"
+  );
+
+  // ✅ 1) Lancer le ping tout de suite (sans attendre la batterie)
+  const pingPromise = jsonpCall_({ action: "ping", source: source, t: String(clientStart) }, 15000);
+
+  // ✅ 2) Batterie en parallèle (best-effort)
   const battPromise = (navigator.getBattery)
     ? navigator.getBattery().then(b => ({
         level: Math.round(b.level*100),
@@ -1681,40 +1696,47 @@ function runDeviceTest(source){
       })).catch(() => null)
     : Promise.resolve(null);
 
-  const net = navigator.connection ? {
-    type: navigator.connection.effectiveType || "",
-    downlink: navigator.connection.downlink || null,
-    rtt: navigator.connection.rtt || null
-  } : null;
+  Promise.allSettled([pingPromise, battPromise]).then((results) => {
+    const pingRes = (results[0].status === "fulfilled") ? results[0].value : null;
+    const batt = (results[1].status === "fulfilled") ? results[1].value : null;
 
-  showTestBanner(`🧪 TEST EN COURS…<br><span style="opacity:.9">Source: ${source}</span>`, "ok");
+    if (!pingRes || !pingRes.ok){
+      showTestBanner(
+        `❌ TEST KO<br><span style="opacity:.9">Réponse serveur invalide</span>`,
+        "ko"
+      );
+      return;
+    }
 
-  battPromise.then(batt => {
-    jsonpCall_({ action: "ping", source: source, t: String(clientStart) })
-      .then((res) => {
-        const clientMs = Date.now() - clientStart;
+    const clientMs = Date.now() - clientStart;
 
-        if (!res || !res.ok){
-          showTestBanner(`❌ TEST KO<br><span style="opacity:.9">Réponse serveur invalide</span>`, "ko");
-          return;
-        }
+    const lines = [];
+    lines.push(`✅ <b>TEST OK</b>`);
+    lines.push(`<span style="opacity:.95">Latence totale: <b>${clientMs} ms</b> (serveur: ${pingRes.serverMs} ms)</span>`);
+    lines.push(`<span style="opacity:.85">Heure serveur: ${pingRes.serverTime}</span>`);
+    if (pingRes.version) lines.push(`<span style="opacity:.85">Version: ${pingRes.version}</span>`);
+    if (net) lines.push(`<span style="opacity:.85">Réseau: ${net.type} (rtt ${net.rtt ?? "?"} ms)</span>`);
+    if (batt) lines.push(`<span style="opacity:.85">Batterie: ${batt.level}% ${batt.charging ? "⚡" : ""}</span>`);
 
-        const lines = [];
-        lines.push(`✅ <b>TEST OK</b>`);
-        lines.push(`<span style="opacity:.95">Latence totale: <b>${clientMs} ms</b> (serveur: ${res.serverMs} ms)</span>`);
-        lines.push(`<span style="opacity:.85">Heure serveur: ${res.serverTime}</span>`);
-        if (res.version) lines.push(`<span style="opacity:.85">Version: ${res.version}</span>`);
-        if (net) lines.push(`<span style="opacity:.85">Réseau: ${net.type} (rtt ${net.rtt ?? "?"} ms)</span>`);
-        if (batt) lines.push(`<span style="opacity:.85">Batterie: ${batt.level}% ${batt.charging ? "⚡" : ""}</span>`);
+    showTestBanner(lines.join("<br>"), "ok");
+    feedbackOK();
+  }).catch((err) => {
+    // Normalement on ne passe plus ici car allSettled, mais on garde une sécurité
+    showTestBanner(
+      `❌ TEST KO<br><span style="opacity:.9">${String(err && err.message ? err.message : err)}</span>`,
+      "ko"
+    );
+  });
 
-        showTestBanner(lines.join("<br>"), "ok");
-        feedbackOK();
-      })
-      .catch(() => {
-        showTestBanner(`❌ TEST KO<br><span style="opacity:.9">Réseau / autorisations / serveur</span>`, "ko");
-      });
+  // ✅ 3) Si le ping échoue, afficher la CAUSE exacte
+  pingPromise.catch((err) => {
+    showTestBanner(
+      `❌ TEST KO<br><span style="opacity:.9">${String(err && err.message ? err.message : err)}</span><br><span style="opacity:.75;font-size:12px;">(timeout vs load error)</span>`,
+      "ko"
+    );
   });
 }
+
 </script>
 </body>
 </html>
