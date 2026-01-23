@@ -59,6 +59,7 @@ html, body{
 
 *{ box-sizing:border-box; }
 
+/* ✅ iOS: NE PAS bloquer le scroll au niveau body */
 body{
   margin:0;
   background: var(--bg);
@@ -67,13 +68,16 @@ body{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* IMPORTANT : on arrête le body fixed qui casse souvent Safari */
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Conteneur principal */
 #app{
+  /* ✅ hauteur fixe => #history a une vraie zone scrollable */
+  height: 100dvh;
   min-height: 100dvh;
+
   display:flex;
   flex-direction:column;
   gap: var(--gap);
@@ -87,8 +91,7 @@ body{
   max-width: 980px;
   margin: 0 auto;
 
-  /* ✅ FIX SCROLL HISTO */
-  overflow: visible; /* au lieu de hidden */
+  overflow: visible;
 }
 
 /* Cards */
@@ -484,19 +487,24 @@ button{
 #btn-scan-stop{ background: rgba(255,255,255,0.18); display:none; color:var(--text); }
 
 /* =========================
-   History (scroll)
+   History (scroll) — ✅ FIX iOS
 ========================= */
 #history{
   flex: 1 1 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 10px;
-  -webkit-overflow-scrolling: touch;
   min-height: 0;
 
-  /* ✅ iOS */
-  height: 100%;
+  overflow: auto; /* ✅ plus fiable iOS que overflow-y/overflow-x */
+  -webkit-overflow-scrolling: touch;
+
+  overscroll-behavior: contain;
   touch-action: pan-y;
+
+  padding: 10px;
+}
+
+/* ✅ la card met overflow:hidden : on force pour iOS */
+#history.card{
+  overflow: auto !important;
 }
 
 .entry{
