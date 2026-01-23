@@ -634,8 +634,8 @@ button{
     <!-- SAISIE -->
     <div id="manualbar" class="card">
       <div class="manual-row">
-        <input id="dossard" type="text" inputmode="numeric" pattern="[0-9]*"
-               autocomplete="off" placeholder="Dossard (1–150)" />
+        <input id="dossard" type="tel" inputmode="numeric" pattern="[0-9]*"
+           autocomplete="off" placeholder="Dossard (1–150)" />
         <button id="btn-valider">Valider</button>
       </div>
     </div>
@@ -1376,25 +1376,38 @@ async function commitScan(dossVal, source){
 function validerSaisie(){
   ensureAudioUnlocked();
 
+  // ✅ garde le focus / clavier même après avoir tapé "Valider"
+  focusWithoutScroll(dossardInput);
+
   const digits = String(dossardInput.value || "").replace(/\D+/g, "");
   const doss = parseInt(digits, 10);
 
   if (doss === 200) {
     runDeviceTest("manual");
     dossardInput.value = "";
+    focusWithoutScroll(dossardInput);
     return;
   }
 
   commitScan(doss, "manual").then(ok => {
     if (ok){
       dossardInput.value = "";
+      // ✅ refocus après l’écriture DB + rendu
       focusWithoutScroll(dossardInput);
+      setTimeout(() => focusWithoutScroll(dossardInput), 0);
+      setTimeout(() => focusWithoutScroll(dossardInput), 60);
     }
   });
 }
 
+
 btnValider.addEventListener("click", validerSaisie);
 dossardInput.addEventListener("keydown", (e) => { if (e.key === "Enter") validerSaisie(); });
+// ✅ iOS: empêcher le bouton de prendre le focus (sinon le clavier se ferme)
+btnValider.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+}, { passive: false });
+
 
 /* =========================================================
    Cancel (annuler) — JSONP (pas fetch)
