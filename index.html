@@ -86,7 +86,9 @@ body{
 
   max-width: 980px;
   margin: 0 auto;
-  overflow: hidden;
+
+  /* ✅ FIX SCROLL HISTO */
+  overflow: visible; /* au lieu de hidden */
 }
 
 /* Cards */
@@ -180,6 +182,16 @@ button{
   font-weight: 900;
   font-size: var(--fs-lg);
   box-shadow: 0 14px 30px rgba(255,122,26,0.30);
+}
+
+/* =========================
+   AUTH
+========================= */
+#auth-card{
+  padding: 14px;
+  display:flex;
+  flex-direction:column;
+  gap: 12px;
 }
 
 /* =========================
@@ -472,7 +484,7 @@ button{
 #btn-scan-stop{ background: rgba(255,255,255,0.18); display:none; color:var(--text); }
 
 /* =========================
-   History
+   History (scroll)
 ========================= */
 #history{
   flex: 1 1 auto;
@@ -481,6 +493,10 @@ button{
   padding: 10px;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+
+  /* ✅ iOS */
+  height: 100%;
+  touch-action: pan-y;
 }
 
 .entry{
@@ -539,6 +555,15 @@ button{
 
 <body>
   <div id="app">
+
+    <!-- AUTH -->
+    <div id="auth-card" class="card" style="display:none;">
+      <div class="label">Mot de passe</div>
+      <input id="auth-pass" class="input" type="password" inputmode="text"
+             autocomplete="off" placeholder="Mot de passe" />
+      <button id="auth-validate" class="btn-primary">Entrer</button>
+      <div id="auth-msg" class="placeholder" style="padding-top:8px; display:none;"></div>
+    </div>
 
     <!-- SETUP -->
     <div id="setup-card" class="card">
@@ -627,8 +652,10 @@ button{
 const API_BASE = "https://script.google.com/macros/s/AKfycbxmddS3Y-40rxY1zK5yR7dGQaTQpbHqJwU5RS7dQtSDMFRQsrjvzd1XJ1zZek6zVAQP4A/exec";
 
 /* =========================================================
-   STATE (in-memory)
+   AUTH
 ========================================================= */
+const PASSWORD = "RG2026*";
+
 let nom = "";
 let emplacement = "";
 let isLocked = true;
@@ -678,10 +705,15 @@ const btnScanStop = document.getElementById("btn-scan-stop");
 
 const history = document.getElementById("history");
 
+/* AUTH DOM */
+const authCard = document.getElementById("auth-card");
+const authPass = document.getElementById("auth-pass");
+const authValidate = document.getElementById("auth-validate");
+const authMsg = document.getElementById("auth-msg");
+
 /* =========================================================
    IndexedDB — durable storage
 ========================================================= */
-
 let dbPromise = null;
 
 function openDb_(){
@@ -871,6 +903,71 @@ async function loadMeta_(){
 }
 
 /* =========================================================
+   AUTH helpers
+========================================================= */
+function isAuthed_(){
+  try{
+    if (sessionStorage.getItem("rg_auth") === "1") return true;
+  }catch(e){}
+  return false;
+}
+
+async function loadAuth_(){
+  if (isAuthed_()) return true;
+  const v = await kvGet_("authOk");
+  if (v && v.ok === true){
+    try{ sessionStorage.setItem("rg_auth", "1"); }catch(e){}
+    return true;
+  }
+  return false;
+}
+
+async function showAuth_(){
+  setupCard.style.display = "none";
+  topbar.style.display = "none";
+  modebar.style.display = "none";
+  manualbar.style.display = "none";
+  camerabar.style.display = "none";
+
+  authCard.style.display = "block";
+  authMsg.style.display = "none";
+  authPass.value = "";
+  setTimeout(() => focusWithoutScroll(authPass), 0);
+}
+
+async function doAuth_(){
+  ensureAudioUnlocked();
+  const p = (authPass.value || "").trim();
+  if (p !== PASSWORD){
+    authMsg.textContent = "Mot de passe incorrect.";
+    authMsg.style.display = "block";
+    return;
+  }
+  await kvSet_("authOk", { ok:true, ts: Date.now() });
+  try{ sessionStorage.setItem("rg_auth", "1"); }catch(e){}
+  authCard.style.display = "none";
+
+  await loadMeta_();
+  await updateSyncChip();
+
+  if (!isLocked){
+    chipNom.textContent = nom;
+    chipEmpl.textContent = emplacement;
+
+    setupCard.style.display = "none";
+    topbar.style.display = "flex";
+    modebar.style.display = "block";
+    setMode("saisie", { skipFocus:true });
+  }else{
+    setupCard.style.display = "block";
+  }
+  await renderHistory();
+}
+
+authValidate.addEventListener("click", doAuth_);
+authPass.addEventListener("keydown", (e) => { if (e.key === "Enter") doAuth_(); });
+
+/* =========================================================
    iOS focus helpers
 ========================================================= */
 function focusWithoutScroll(el){
@@ -896,6 +993,7 @@ function bindNoRecenterFocus(el){
 }
 bindNoRecenterFocus(setupNom);
 bindNoRecenterFocus(dossardInput);
+bindNoRecenterFocus(authPass);
 
 /* =========================================================
    Feedback scan (pulse + bip + vibration)
@@ -989,6 +1087,58 @@ async function updateSyncChip(){
   chipSync.classList.toggle("sending", !!sending);
 }
 
+/* =========================================================
+   CSV Export
+========================================================= */
+function csvEscape_(v){
+  const s = (v === null || v === undefined) ? "" : String(v);
+  const needs = /[",\n\r]/.test(s);
+  const out = s.replace(/"/g, '""');
+  return needs ? `"${out}"` : out;
+}
+
+function formatDateTime_(ts){
+  if (!ts) return "";
+  return new Date(ts).toLocaleString("fr-FR", { hour12:false });
+}
+
+async function exportCsv(){
+  const scans = await scanQueryLatest_(5000);
+  const rows = scans.filter(s => !!s);
+
+  const header = ["ID","Nom","Emplacement","Dossard","Heure pointage","Annulation","heure copie"];
+  const lines = [header.join(",")];
+
+  for (const s of rows){
+    const line = [
+      csvEscape_(s.id),
+      csvEscape_(s.nom),
+      csvEscape_(s.emplacement),
+      csvEscape_(s.dossard),
+      csvEscape_(formatDateTime_(s.tsMs)),
+      csvEscape_(s.cancelled ? "OUI" : ""),
+      csvEscape_(formatDateTime_(s.sentAtMs))
+    ].join(",");
+    lines.push(line);
+  }
+
+  const blob = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `running-games-export-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+window.exportCsv = exportCsv;
+
+/* =========================================================
+   History render
+========================================================= */
 async function renderHistory(){
   if (isLocked){
     history.innerHTML = `<div class="placeholder">En attente de validation (Nom + Emplacement)…</div>`;
@@ -1004,7 +1154,18 @@ async function renderHistory(){
     return;
   }
 
-  history.innerHTML = visible.map(s => {
+  const exportBar = (mode === "historique")
+    ? `
+      <div style="position:sticky; top:0; z-index:5; padding:10px; background:rgba(11,11,12,0.92); backdrop-filter:blur(10px); border-bottom:1px solid rgba(255,255,255,0.08);">
+        <button class="btn-primary" style="height:54px; font-size:16px;" onclick="exportCsv()">Exporter CSV</button>
+        <div style="margin-top:8px; opacity:.8; font-size:12px;">
+          Colonnes: ID, Nom, Emplacement, Dossard, Heure pointage, Annulation, heure copie
+        </div>
+      </div>
+    `
+    : "";
+
+  history.innerHTML = exportBar + visible.map(s => {
     const label = `${format(s.tsMs)} — ${s.emplacement} — #${s.dossard}${s.source === "scan" ? " 📷" : ""}`;
     const cancelledCls = s.cancelled ? "entry-cancelled" : "";
     const delBtn = s.cancelled ? "" : `<button class="entry-delete" onclick="annuler('${s.id}', this)">×</button>`;
@@ -1025,6 +1186,13 @@ window.addEventListener("load", async () => {
     await openDb_();
   }catch(e){
     history.innerHTML = `<div class="placeholder">Erreur stockage local (IndexedDB). Vérifie Safari (pas mode privé).</div>`;
+    return;
+  }
+
+  // ✅ AUTH avant tout
+  const okAuth = await loadAuth_();
+  if (!okAuth){
+    await showAuth_();
     return;
   }
 
@@ -1156,7 +1324,8 @@ async function commitScan(dossVal, source){
     source,              // "scan" | "manual"
     cancelled: false,
     status: "pending",   // pending | inflight | sent | cancelled
-    ageMs: 0
+    ageMs: 0,
+    sentAtMs: null       // ✅ heure copie (quand confirmé côté serveur)
   };
 
   await scanPut_(scanObj);
@@ -1266,6 +1435,7 @@ async function sendNow() {
         if (!s) continue;
         if (s.status === "inflight") {
           s.status = "sent";
+          s.sentAtMs = Date.now(); // ✅ heure copie
           await scanPut_(s);
         }
       }
