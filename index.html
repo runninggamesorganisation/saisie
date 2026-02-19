@@ -698,6 +698,8 @@ button{
    CONFIG
 ========================================================= */
 const API_BASE = "https://script.google.com/macros/s/AKfycbz_1RhqLeKK4lmQkPCpUA-bcXZQp6zDMEA61uTU-gfhvrdynZRTjR7wajppTmym4S3YYQ/exec";
+const INFLIGHT_TTL_MS = 30_000;
+
 
 /* =========================================================
    AUTH
@@ -858,6 +860,32 @@ async function scanQueryLatest_(limit){
     req.onerror = () => reject(req.error);
   });
 }
+
+async function recoverStaleInflight_(){
+  const now = Date.now();
+  const scans = await scanQueryLatest_(5000);
+
+  let changed = 0;
+  for (const s of scans){
+    if (!s || s.cancelled) continue;
+
+    if (s.status === "inflight"){
+      const age = (typeof s.tsMs === "number") ? (now - s.tsMs) : Infinity;
+      // Si ça fait trop longtemps qu’on est en inflight => on remet pending
+      if (age > INFLIGHT_TTL_MS){
+        s.status = "pending";
+        await scanPut_(s);
+        changed++;
+      }
+    }
+  }
+
+  if (changed > 0){
+    await updateSyncChip();
+  }
+  return changed;
+}
+
 
 async function scanPickPendingBatch_(maxBatch){
   const db = await openDb_();
@@ -1239,6 +1267,11 @@ async function renderHistory(){
 window.addEventListener("load", async () => {
   try{
     await openDb_();
+     // ✅ récupération des inflight bloqués (cas kill pendant synchro)
+    await recoverStaleInflight_();
+  
+    const batch = await scanPickPendingBatch_(1);
+    if (batch.length > 0) scheduleSend();
   }catch(e){
     historyList.innerHTML = `<div class="placeholder">Erreur stockage local (IndexedDB). Vérifie Safari (pas mode privé).</div>`;
     return;
@@ -1475,6 +1508,9 @@ function scheduleSend() {
 async function sendNow() {
   if (sending) return;
 
+  // ✅ récupère inflight bloqués avant de choisir le batch
+  await recoverStaleInflight_();
+  
   const batch = await scanPickPendingBatch_(MAX_BATCH);
   if (batch.length === 0) { await updateSyncChip(); return; }
 
