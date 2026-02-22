@@ -697,7 +697,7 @@ button{
 /* =========================================================
    CONFIG
 ========================================================= */
-const API_BASE = "https://script.google.com/macros/s/AKfycbzQL8oR2nEEPF77toFyvTcCV4FgVWvJyOFlYF_yqLngDxzii05OD6aMEkGXKY_M_xIPbQ/exec";
+const API_BASE = "https://script.google.com/macros/s/AKfycbxn1ZWeLVcUtdoyu2RAJ_PjIvGpngHPiwQorbOVdlnxPjRb-uslOK80OxtQHA4-E5bPCg/exec";
 const INFLIGHT_TTL_MS = 30_000;
 
 
@@ -1531,14 +1531,13 @@ async function sendNow() {
 
   jsonpAppend_(lot)
     .then(async (res) => {
-  if (!res || !res.ok) throw new Error("api error");
-  const ackIds = (res.ack && Array.isArray(res.ack.ids)) ? res.ack.ids.map(String) : null;
-  if (!ackIds) throw new Error("missing ack ids");
+  if (!res || !res.ok || !res.ack || !Array.isArray(res.ack.ids)) {
+    throw new Error("invalid ack");
+  }
 
-  const ackSet = new Set(ackIds);
+  const ackSet = new Set(res.ack.ids.map(String));
 
-  // ✅ On ne passe en "sent" que les IDs réellement ackés
-  for (const id of ids){
+  for (const id of ids) {
     const s = await scanGet_(id);
     if (!s) continue;
 
@@ -1546,12 +1545,11 @@ async function sendNow() {
       if (ackSet.has(String(id))) {
         s.status = "sent";
         s.sentAtMs = Date.now();
-        await scanPut_(s);
       } else {
-        // ❗ pas acké => on remet pending pour retry
+        // 🔁 pas écrit => on remet pending
         s.status = "pending";
-        await scanPut_(s);
       }
+      await scanPut_(s);
     }
   }
 
