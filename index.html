@@ -697,7 +697,7 @@ button{
 /* =========================================================
    CONFIG
 ========================================================= */
-const API_BASE = "https://script.google.com/macros/s/AKfycbz_1RhqLeKK4lmQkPCpUA-bcXZQp6zDMEA61uTU-gfhvrdynZRTjR7wajppTmym4S3YYQ/exec";
+const API_BASE = "https://script.google.com/macros/s/AKfycbzQL8oR2nEEPF77toFyvTcCV4FgVWvJyOFlYF_yqLngDxzii05OD6aMEkGXKY_M_xIPbQ/exec";
 const INFLIGHT_TTL_MS = 30_000;
 
 
@@ -870,7 +870,7 @@ async function recoverStaleInflight_(){
     if (!s || s.cancelled) continue;
 
     if (s.status === "inflight"){
-      const age = (typeof s.tsMs === "number") ? (now - s.tsMs) : Infinity;
+      const age = (typeof s.inflightAtMs === "number") ? (now - s.inflightAtMs) : Infinity;
       // Si ça fait trop longtemps qu’on est en inflight => on remet pending
       if (age > INFLIGHT_TTL_MS){
         s.status = "pending";
@@ -1519,6 +1519,7 @@ async function sendNow() {
 
   for (const s of batch){
     s.status = "inflight";
+    s.inflightAtMs = now;
     s.ageMs = (typeof s.tsMs === "number") ? (now - s.tsMs) : 0;
     await scanPut_(s);
   }
@@ -1530,32 +1531,44 @@ async function sendNow() {
 
   jsonpAppend_(lot)
     .then(async (res) => {
-      if (!res || !res.ok) throw new Error("api error");
+  if (!res || !res.ok) throw new Error("api error");
+  const ackIds = (res.ack && Array.isArray(res.ack.ids)) ? res.ack.ids.map(String) : null;
+  if (!ackIds) throw new Error("missing ack ids");
 
-      for (const id of ids){
-        const s = await scanGet_(id);
-        if (!s) continue;
-        if (s.status === "inflight") {
-          s.status = "sent";
-          s.sentAtMs = Date.now();
-          await scanPut_(s);
-        }
+  const ackSet = new Set(ackIds);
+
+  // ✅ On ne passe en "sent" que les IDs réellement ackés
+  for (const id of ids){
+    const s = await scanGet_(id);
+    if (!s) continue;
+
+    if (s.status === "inflight") {
+      if (ackSet.has(String(id))) {
+        s.status = "sent";
+        s.sentAtMs = Date.now();
+        await scanPut_(s);
+      } else {
+        // ❗ pas acké => on remet pending pour retry
+        s.status = "pending";
+        await scanPut_(s);
       }
+    }
+  }
 
-      sending = false;
-      retryDelay = 200;
+  sending = false;
+  retryDelay = 200;
 
-      clearTimeout(inactivityTimer);
-      clearTimeout(maxAgeTimer);
-      inactivityTimer = null;
-      maxAgeTimer = null;
-      firstScanTimestamp = null;
+  clearTimeout(inactivityTimer);
+  clearTimeout(maxAgeTimer);
+  inactivityTimer = null;
+  maxAgeTimer = null;
+  firstScanTimestamp = null;
 
-      await updateSyncChip();
+  await updateSyncChip();
 
-      const more = await scanPickPendingBatch_(1);
-      if (more.length > 0) scheduleSend();
-    })
+  const more = await scanPickPendingBatch_(1);
+  if (more.length > 0) scheduleSend();
+})
     .catch(async () => {
       for (const id of ids){
         const s = await scanGet_(id);
