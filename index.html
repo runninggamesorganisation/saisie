@@ -697,7 +697,7 @@ button{
 /* =========================================================
    CONFIG
 ========================================================= */
-const API_BASE = "https://script.google.com/macros/s/AKfycbxR6pc7eRsPfOph8mYrfXJUYdJ1sY2fQa5NVi9DKo2EwM2MZQTty_JgVlfxNfVvYXpHgQ/exec";
+const API_BASE = "https://script.google.com/macros/s/AKfycbyxXu1XO9uXjYLxAXpUpV3TKzZXr5JdRjXewH-Yd_DmBB3DQoQleP4GUtUH2eeLNY-BfQ/exec";
 const INFLIGHT_TTL_MS = 30_000;
 
 
@@ -717,7 +717,7 @@ let mode = "saisie"; // saisie | scan | historique
 let sending = false;
 
 const INACTIVITY_DELAY = 5000;
-const MAX_BATCH = 30;
+const MAX_BATCH = 20;
 const MAX_AGE = 30000;
 let inactivityTimer = null;
 let maxAgeTimer = null;
@@ -963,7 +963,7 @@ function jsonpCall_(paramsObj, timeoutMs = 15000){
   });
 }
 
-function jsonpAppend_(lot, timeoutMs = 15000){
+function jsonpAppend_(lot, timeoutMs = 30000){
   const payload = b64WebSafe_(JSON.stringify(lot));
   return jsonpCall_({ action: "append", payload }, timeoutMs);
 }
@@ -1531,22 +1531,26 @@ async function sendNow() {
 
   jsonpAppend_(lot)
     .then(async (res) => {
-  if (!res || !res.ok || !res.ack || !Array.isArray(res.ack.ids)) {
-    throw new Error("invalid ack");
-  }
+  if (!res || !res.ok || !res.ack) throw new Error("invalid ack");
 
-  const ackSet = new Set(res.ack.ids.map(String));
+  const ack = res.ack;
+
+  const writtenIds = Array.isArray(ack.writtenIds) ? ack.writtenIds.map(String) : [];
+  const seenIds    = Array.isArray(ack.seenIds)    ? ack.seenIds.map(String)    : [];
+
+  // ✅ IDs confirmés = déjà connus OU écrits/relus
+  const okSet = new Set([...writtenIds, ...seenIds]);
 
   for (const id of ids) {
     const s = await scanGet_(id);
     if (!s) continue;
 
     if (s.status === "inflight") {
-      if (ackSet.has(String(id))) {
+      if (okSet.has(String(id))) {
         s.status = "sent";
         s.sentAtMs = Date.now();
       } else {
-        // 🔁 pas écrit => on remet pending
+        // ❗ pas confirmé => on remet pending (il sera renvoyé)
         s.status = "pending";
       }
       await scanPut_(s);
